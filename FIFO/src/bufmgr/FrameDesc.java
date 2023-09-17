@@ -22,6 +22,10 @@ class FrameDesc {
   /** Generic state used by replacers. */
   public int state;
 
+  public int numOfHits;
+
+  public int numOfLoads;
+
   // --------------------------------------------------------------------------
 
   /**
@@ -33,6 +37,8 @@ class FrameDesc {
     pincnt = 0;
     dirty = false;
     state = 0;
+    numOfHits = 0;
+    numOfLoads = 0;
   }
 
 } // class FrameDesc

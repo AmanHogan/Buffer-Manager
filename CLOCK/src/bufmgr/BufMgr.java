@@ -7,6 +7,8 @@ import global.PageId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 
 /* revised slightly by sharma on 8/22/2023 */
 
@@ -51,10 +53,11 @@ public class BufMgr implements GlobalConst {
     protected int pageLoadRequests;
     protected int uniquePageLoads = 0;
     protected int pageFaults = 0;
-    protected float aggregateBHR = 0;
-    protected float pageLoadBHR = -1;
-    protected int[] pageRefCount = new int[100];
+    protected double aggregateBHR = 0;
+    protected double pageLoadBHR = -1;
     protected final int maxPages = 100;
+    protected int[][] pageRefCount = new int[100][4]; 
+
 
     
 //----------------------------List<E>-----------------------------
@@ -69,6 +72,7 @@ public class BufMgr implements GlobalConst {
   public BufMgr(int numbufs) 
   {   
 	  //initializing buffer pool and frame table 
+      // TODO: REMEMBER TO CHANGE THIS BUFPOOL BACK!!!!
       numbufs = 15;
 	  bufpool = new Page[numbufs];
       frametab = new FrameDesc[numbufs];
@@ -77,10 +81,16 @@ public class BufMgr implements GlobalConst {
       
       for(int i = 0; i < frametab.length; i++)
       {
-              bufpool[i] = new Page();
-    	  	  frametab[i] = new FrameDesc(i);
+            bufpool[i] = new Page();
+            frametab[i] = new FrameDesc(i);
       }
-      
+
+      for(int i = 0; i < 9; i++)
+      {
+        pageRefCount[i][0] = -1;
+      }
+
+
       //initializing page map and replacer here. 
       pagemap = new HashMap<Integer, FrameDesc>(numbufs);
       replacer = new Clock(this);   // change Policy to replacement class name
@@ -183,19 +193,22 @@ public class BufMgr implements GlobalConst {
     {  
         //the frame descriptor as the page is in the buffer pool 
 	    FrameDesc tempfd = pagemap.get(Integer.valueOf(pageno.pid));
-	  
+
+        if(tempfd != null && tempfd.pageno.pid > 8 )
+        {
+            pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
+            pageRefCount[tempfd.pageno.pid][2] = pageRefCount[tempfd.pageno.pid][2] + 1;
+        }
+
         if(tempfd != null)
 	    {
-            
-          
-            
             //if the page is in the pool and already pinned then by using PIN_MEMCPY(true) throws an exception "Page pinned PIN_MEMCPY not allowed" 
             if(skipRead)
             {
                 throw new IllegalArgumentException("Page pinned so PIN_MEMCPY not allowed");
             }
                 
-          
+
             else
             {
                 //else the page is in the pool and has not been pinned so incrementing the pincount and setting Policy status to pinned
@@ -207,8 +220,6 @@ public class BufMgr implements GlobalConst {
                 if(tempfd.pageno.pid > 8)
                 {
                     totPageHits++;
-                    tempfd.numOfHits++;
-                    pageRefCount[tempfd.pageno.pid] = tempfd.numOfHits;
                 }
                 
                 return;
@@ -219,41 +230,63 @@ public class BufMgr implements GlobalConst {
         {   
             //as the page is not in pool choosing a victim
             int i = replacer.pickVictim();
-
           
             //if buffer pool is full throws an Exception("Buffer pool exceeded")
             if(i < 0)
                 throw new IllegalStateException("Buffer pool exceeded");
                 
             tempfd = frametab[i];
+            if(tempfd != null && tempfd.pageno.pid > 8 )
+            {
+                pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
+                pageRefCount[tempfd.pageno.pid][3] = pageRefCount[tempfd.pageno.pid][3] + 1;
+            }
+
 
             
           
-            //if the victim is dirty writing it to disk 
+            // if the victim is dirty writing it to disk 
             if(tempfd.pageno.pid != -1)
             {
-                
-
                 pagemap.remove(Integer.valueOf(tempfd.pageno.pid));
                 if(tempfd.dirty)
+                {
+                    //pageRefCount[tempfd.pageno.pid][1] = pageRefCount[tempfd.pageno.pid][1] + 1;
                     Minibase.DiskManager.write_page(tempfd.pageno, bufpool[i]);
+
+    
+                }
+                    
             }
 
             //reading the page from disk to the page given and pinning it. 
             if(skipRead)
+            {
                 bufpool[i].copyPage(page);
+
+
+            }
+                
             else
+            {
                 Minibase.DiskManager.read_page(pageno, bufpool[i]);
+
+            }
+                
             
             page.setPage(bufpool[i]);
-            tempfd.numOfLoads++;
+   
+
             pageLoadRequests++;
-            
-            
+            if(tempfd.pageno.pid != -1 && tempfd.pageno.pid > 8)
+            {   
+                tempfd.numOfLoads++;
+                pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
+                pageRefCount[tempfd.pageno.pid][1] = pageRefCount[tempfd.pageno.pid][1] + 1;
+            }
 	    }
 
         //updating frame descriptor and notifying to replacer
-        
         tempfd.pageno.pid = pageno.pid;
         tempfd.pincnt = 1;
         tempfd.dirty = false;
@@ -366,58 +399,44 @@ public class BufMgr implements GlobalConst {
     
     public void printBhrAndRefCount(){ 
     
-    
+    Arrays.sort(pageRefCount, (a, b) -> Integer.compare(b[2],a[2])); //decreasing order
+    pageLoadRequests = pageLoadRequests - 1;
+    aggregateBHR = ( (double)totPageHits / (double)pageLoadRequests ); //replce -1 with the formula   
+    pageLoadBHR = -1;  //replce -1 with the formula  
     //print counts:
     System.out.println("+----------------------------------------+");
-    System.out.println("Aggregate Page Hits: "+totPageHits);
+    System.out.println("Aggregate Page Hits: "+ totPageHits);
     System.out.println("+----------------------------------------+");
-    //System.out.println("totPageRequests: "+totPageRequests);
-    //System.out.println("pageLoadHits: "+pageLoadHits);
-    System.out.println("Aggregate Page Loads: "+pageLoadRequests);
+    System.out.println("Aggregate Page Loads: "+ pageLoadRequests);
     System.out.println("+----------------------------------------+");
-    System.out.println("Unique page loads: "+uniquePageLoads);
-    System.out.println("Page faults (policy dependent): "+pageFaults);
+    System.out.print("Aggregate BHR (BHR1) : ");
+    System.out.printf("%9.5f\n", aggregateBHR);
     System.out.println("+----------------------------------------+");
-    
-    System.out.println("+----------------------------------------+");
-    System.out.println("Page No.\tNo. of Page Hits");
-
-    for (int i = 0; i < pageRefCount.length; i++) {
-        System.out.println(i + "\t\t" + + pageRefCount[i]);
+    System.out.println("The top pages with respect to hits are:\n");
+    if(totPageHits > 0)
+    {
+        System.out.println("Page No.\tNo. of Page Loads\tNo. of Page Hits\tNo. of times Victim\tHit Ratios");
+        for(int i =0; i <  pageRefCount.length; i++)
+        {
+            System.out.println(pageRefCount[i][0] + "\t\t\t" + pageRefCount[i][1] + "\t\t\t" + pageRefCount[i][2] + "\t\t\t" + pageRefCount[i][3] + "\t\t\t" + (pageRefCount[i][2]/totPageHits));
+        }
     }
 
+    else
+    {
+        System.out.println("Page No.\tNo. of Page Loads\tNo. of Page Hits\tNo. of times Victim\tHit Ratios");
+        for(int i =0; i < pageRefCount.length; i++)
+        {
+            System.out.println(pageRefCount[i][0] + "\t\t\t" + pageRefCount[i][1] + "\t\t\t" + pageRefCount[i][2] + "\t\t\t" + pageRefCount[i][3] + "\t\t\t" + 0);
+        }
+    }
     System.out.println("+----------------------------------------+");
-    //compute BHR1 and BHR2 
-    aggregateBHR = -1; //replce -1 with the formula   
-    pageLoadBHR = -1;  //replce -1 with the formula  
-  
-    System.out.print("Aggregate BHR (BHR1): ");
-    System.out.printf("%9.5f\n", aggregateBHR);
-    System.out.print("Load-based BHR (BHR2): ");
-    System.out.printf("%9.5f\n", pageLoadBHR);
-    System.out.println("+----------------------------------------+");
-
-
-    
-       
-/*    //before sorting, need to compare the LAST refcounts and fix it
-    for (int i = 0; i < pageRefCount.length ; i++) {
-        if (pageRefCount[i][0] > pageRefCount[i][1]) pageRefCount[i][1] = pageRefCount[i][0];
+    for(int i = 0; i < pageRefCount.length; i++)
+    {
         pageRefCount[i][0] = 0;
     }
-    //Sort and print top k page references here. done by this code
-    sortbyColumn(pageRefCount, 1);
-    
-    System.out.println("The top k (10) referenced pages are:");
-    System.out.println("       Page No.\t\tNo. of references");
-       
-    for (int i = 0; i < 10 ; i++)    
-      System.out.println("\t"+pageRefCount[i][2]+"\t\t"+pageRefCount[i][1]);
-    
-    System.out.println("+----------------------------------------+");
-    //* System.out.println("pageRefCount.length: "+pageRefCount.length);
-    // *for (int i = 0; i < pageRefCount.length ; i++)    
-      // *System.out.println("\t"+pageRefCount[i][2]+"\t\t"+pageRefCount[i][1]+"\t\t"+pageRefCount[i][0]);*/
+
+
 }
 
 } // public class BufMgr implements GlobalConst

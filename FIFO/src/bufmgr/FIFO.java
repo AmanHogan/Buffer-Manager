@@ -8,7 +8,7 @@ import global.*;
    * class Policy is a subclass of class Replacer use the given replacement
    * policy algorithm for page replacement
    */
-class Policy extends  Replacer {   
+class FIFO extends  Replacer {   
 //replace Policy above with impemented policy name (e.g., Lru, Clock)
 
   //
@@ -39,9 +39,8 @@ class Policy extends  Replacer {
    * This pushes the given frame to the end of the list.
    * @param frameNo	the frame number
    */
-  private void update(int frameNo)
-  {
-     //This function is to be used for LRU and MRU
+  private void update(int frameNo) {
+    // For FIFO, you don't need to update the order of pages.
   }
 
   /**
@@ -80,8 +79,10 @@ class Policy extends  Replacer {
    * Notifies the replacer of a pined page.
    */
   public void pinPage(FrameDesc fdesc) {
-        
+    int frameIndex = fdesc.index;
+    frametab[frameIndex].state = PINNED;
   }
+  
 
   /**
    * Notifies the replacer of an unpinned page.
@@ -98,10 +99,25 @@ class Policy extends  Replacer {
    *		return -1 if failed
    */
 
- public int pickVictim()
- {
-   //remove the below statement and write your code
-	   return 1; //for compilation
- }
+   public int pickVictim() {
+    int numberOfBuffers = mgrArg.getNumBuffers();
+    int victimFrame = -1; // Initialize with an invalid value.
+  
+    if (nframes < numberOfBuffers) {
+      victimFrame = nframes++;
+      return victimFrame;
+    }
+  
+    // Implement FIFO logic to select the victim frame.
+    victimFrame = frames[0]; // Get the frame at the front of the queue (oldest page).
+    
+    // Remove the frame from the queue (shift the remaining frames forward).
+    for (int i = 0; i < nframes - 1; i++) {
+      frames[i] = frames[i + 1];
+    }
+  
+    return victimFrame;
+  }
+  
  }
 

@@ -1,47 +1,53 @@
 package bufmgr;
-
 import global.GlobalConst;
 import global.Minibase;
 import global.Page;
 import global.PageId;
 import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 
 /* revised slightly by sharma on 8/22/2023 */
 
 /**
- * <h3>Minibase Buffer Manager</h3>
  * The buffer manager reads disk pages into a mains memory page as needed. The
  * collection of main memory pages (called frames) used by the buffer manager
  * for this purpose is called the buffer pool. This is just an array of Page
- * objects. The buffer manager is used by access methods, heap files, and
- * relational operators to read, write, allocate, and de-allocate pages.
- * policy class name has to be changed in the constructior using name of the 
- * class you have implementaed
+ * objects. 
  */
-public class BufMgr implements GlobalConst {
-
-    /** Actual pool of pages (can be viewed as an array of byte arrays). */
+public class BufMgr implements GlobalConst 
+{
+    /* Pool of pages (can be viewed as an array of byte arrays). */
     protected Page[] bufpool;
 
-    /** Array of descriptors, each containing the pin count, dirty status, etc\
-	. */
+    /* Array of Frame descriptors*/
     protected FrameDesc[] frametab;
 
-    /** Maps current page numbers to frames; used for efficient lookups. */
+    /* Maps current page numbers to frames */
     protected HashMap<Integer, FrameDesc> pagemap;
 
-    /** The replacement policy to use. */
+    /* The replacement policy to use. */
     protected Replacer replacer;
     
-//-------------------------------------------------------------
-    /** 
-        you may add HERE variables NEEDED for calculating hit ratios 
-        a public void printBhrAndRefCount() has been provided at the bottom 
-        which is called from test modules. To use that
-            either use the same variable names OR
-            modify the print method with variables you have used
-    */     
-//-------------------------------------------------------------
+    // Keeps track of the number of 
+    protected int[][] pageRefCount = new int[100][4]; 
+
+    protected int totPageHits;
+    protected int totPageRequests;
+    protected int pageLoadHits;
+    protected int pageLoadRequests;
+    protected int uniquePageLoads = 0;
+    protected int pageFaults = 0;
+    protected double aggregateBHR = 0;
+    protected double pageLoadBHR = -1;
+    protected final int maxPages = 100;
+
+
+
+    
+//----------------------------List<E>-----------------------------
 
 
 
@@ -53,18 +59,28 @@ public class BufMgr implements GlobalConst {
   public BufMgr(int numbufs) 
   {   
 	  //initializing buffer pool and frame table 
+      // TODO: REMEMBER TO CHANGE THIS BUFPOOL BACK!!!!
+      numbufs = 15;
 	  bufpool = new Page[numbufs];
       frametab = new FrameDesc[numbufs];
+
+ 
       
       for(int i = 0; i < frametab.length; i++)
       {
-              bufpool[i] = new Page();
-    	  	  frametab[i] = new FrameDesc(i);
+            bufpool[i] = new Page();
+            frametab[i] = new FrameDesc(i);
       }
-      
+
+      for(int i = 0; i < 9; i++)
+      {
+        pageRefCount[i][0] = -1;
+      }
+
+
       //initializing page map and replacer here. 
       pagemap = new HashMap<Integer, FrameDesc>(numbufs);
-      replacer = new Policy(this);   // change Policy to replacement class name
+      replacer = new FIFO(this);   // change Policy to replacement class name
   }
 
   /**
@@ -78,13 +94,22 @@ public class BufMgr implements GlobalConst {
    * @throws IllegalStateException if all pages are pinned (i.e. pool exceeded)
    */
 
-  public PageId newPage(Page firstpg, int run_size)
-  {
+    public PageId newPage(Page firstpg, int run_size)
+    {
+        // Initializing variables for page hit and page load count
+        totPageHits = 0;
+        totPageRequests = 0;
+        pageLoadHits = 0;
+        pageLoadRequests = 0;
+
+        // TODO: Initialize arrays for printing top k Page Reference
+      
 	  //Allocating set of new pages on disk using run size. 8/22/2023
 	  PageId firstpgid = Minibase.DiskManager.allocate_page(run_size);
 	  try {
 		  //pin the first page using pinpage() function using the id of firstpage, page firstpg and skipread = PIN_MEMCPY(true)
 		  pinPage(firstpgid, firstpg, PIN_MEMCPY);
+
           }
           catch (Exception e) {
         	  //pinning failed so deallocating the pages from disk
@@ -92,6 +117,7 @@ public class BufMgr implements GlobalConst {
         	  {   
         		  firstpgid.pid += i;
  	  	          Minibase.DiskManager.deallocate_page(firstpgid);
+                
         	  }
         	  return null;
       }
@@ -100,6 +126,7 @@ public class BufMgr implements GlobalConst {
       replacer.newPage(pagemap.get(Integer.valueOf(firstpgid.pid)));
       
       // you may have to add some BHR code here
+      
       
       //return the page id of the first page
       return firstpgid; 
@@ -116,19 +143,23 @@ public class BufMgr implements GlobalConst {
   {  
 	  //the frame descriptor as the page is in the buffer pool 
 	  FrameDesc tempfd = pagemap.get(Integer.valueOf(pageno.pid));
-	  //the page is in the pool so it cannot be null.
+	  
+      //the page is in the pool so it cannot be null.
       if(tempfd != null)
       {
     	  //checking the pin count of frame descriptor
           if(tempfd.pincnt > 0)
               throw new IllegalArgumentException("Page currently pinned");
-          //remove page as it's pin count is 0, remove the page, updating its pin count and dirty status, the policy and notifying replacer.
+          
+            //remove page as it's pin count is 0, remove the page, updating its pin count and dirty status, the policy and notifying replacer.
           pagemap.remove(Integer.valueOf(pageno.pid));
           tempfd.pageno.pid = INVALID_PAGEID;
           tempfd.pincnt = 0;
           tempfd.dirty = false;
-          tempfd.state = Policy.AVAILABLE;
+          tempfd.state = FIFO.AVAILABLE;
           replacer.freePage(tempfd);
+
+          
       }
       //deallocate the page from disk 
       Minibase.DiskManager.deallocate_page(pageno);
@@ -145,60 +176,113 @@ public class BufMgr implements GlobalConst {
    * @throws IllegalArgumentException if PIN_MEMCPY and the page is pinned
    * @throws IllegalStateException if all pages are pinned (i.e. pool exceeded)
    */
-  public void pinPage(PageId pageno, Page page, boolean skipRead) 
-  {  
-	  //the frame descriptor as the page is in the buffer pool 
-	  FrameDesc tempfd = pagemap.get(Integer.valueOf(pageno.pid));
-	  if(tempfd != null)
-	  {
-		  //if the page is in the pool and already pinned then by using PIN_MEMCPY(true) throws an exception "Page pinned PIN_MEMCPY not allowed" 
-          if(skipRead)
-        	  throw new IllegalArgumentException("Page pinned so PIN_MEMCPY not allowed");
-          else
-          {
-        	  //else the page is in the pool and has not been pinned so incrementing the pincount and setting Policy status to pinned
-        	  tempfd.pincnt++;
-        	  tempfd.state = Policy.PINNED;
-              page.setPage(bufpool[tempfd.index]);
-              //some BHR code may go here
-              return;
-          }
-	  }
-	  else
-	  {
-		  //as the page is not in pool choosing a victim
-          int i = replacer.pickVictim();
-          //if buffer pool is full throws an Exception("Buffer pool exceeded")
-          if(i < 0)
-        	  throw new IllegalStateException("Buffer pool exceeded");
+    public void pinPage(PageId pageno, Page page, boolean skipRead) 
+    {  
+        //the frame descriptor as the page is in the buffer pool 
+	    FrameDesc tempfd = pagemap.get(Integer.valueOf(pageno.pid));
+
+        if(tempfd != null && tempfd.pageno.pid > 8 )
+        {
+            pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
+            pageRefCount[tempfd.pageno.pid][2] = pageRefCount[tempfd.pageno.pid][2] + 1;
+        }
+
+        if(tempfd != null)
+	    {
+            //if the page is in the pool and already pinned then by using PIN_MEMCPY(true) throws an exception "Page pinned PIN_MEMCPY not allowed" 
+            if(skipRead)
+            {
+                throw new IllegalArgumentException("Page pinned so PIN_MEMCPY not allowed");
+            }
                 
-          tempfd = frametab[i];
+
+            else
+            {
+                //else the page is in the pool and has not been pinned so incrementing the pincount and setting Policy status to pinned
+                tempfd.pincnt++;
+                tempfd.state = FIFO.PINNED;
+                page.setPage(bufpool[tempfd.index]);
+                
+                //some BHR code may go here
+                if(tempfd.pageno.pid > 8)
+                {
+                    totPageHits++;
+                }
+                
+                return;
+            }
+        }
+
+        else
+        {   
+            //as the page is not in pool choosing a victim
+            int i = replacer.pickVictim();
           
-          //if the victim is dirty writing it to disk 
-          if(tempfd.pageno.pid != -1)
-          {
-        	  pagemap.remove(Integer.valueOf(tempfd.pageno.pid));
-        	  if(tempfd.dirty)
-           		  Minibase.DiskManager.write_page(tempfd.pageno, bufpool[i]);
-// some BHR code may go here
-          }
-          //reading the page from disk to the page given and pinning it. 
-          if(skipRead)
-        	  bufpool[i].copyPage(page);
-          else
-          	  Minibase.DiskManager.read_page(pageno, bufpool[i]);
-          page.setPage(bufpool[i]);
-// some BHR code may go here
-	  }
-	  	  //updating frame descriptor and notifying to replacer
-	      tempfd.pageno.pid = pageno.pid;
-          tempfd.pincnt = 1;
-          tempfd.dirty = false;
-          pagemap.put(Integer.valueOf(pageno.pid), tempfd);
-          tempfd.state =Policy.PINNED;
-      	  replacer.pinPage(tempfd);
+            //if buffer pool is full throws an Exception("Buffer pool exceeded")
+            if(i < 0)
+                throw new IllegalStateException("Buffer pool exceeded");
+                
+            tempfd = frametab[i];
+            if(tempfd != null && tempfd.pageno.pid > 8 )
+            {
+                pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
+                pageRefCount[tempfd.pageno.pid][3] = pageRefCount[tempfd.pageno.pid][3] + 1;
+            }
+
+
+            
+          
+            // if the victim is dirty writing it to disk 
+            if(tempfd.pageno.pid != -1)
+            {
+                pagemap.remove(Integer.valueOf(tempfd.pageno.pid));
+                if(tempfd.dirty)
+                {
+                    //pageRefCount[tempfd.pageno.pid][1] = pageRefCount[tempfd.pageno.pid][1] + 1;
+                    Minibase.DiskManager.write_page(tempfd.pageno, bufpool[i]);
+
+    
+                }
+                    
+            }
+
+            //reading the page from disk to the page given and pinning it. 
+            if(skipRead)
+            {
+                bufpool[i].copyPage(page);
+
+
+            }
+                
+            else
+            {
+                Minibase.DiskManager.read_page(pageno, bufpool[i]);
+
+            }
+                
+            
+            page.setPage(bufpool[i]);
    
-  }
+
+            pageLoadRequests++;
+            if(tempfd.pageno.pid != -1 && tempfd.pageno.pid > 8)
+            {   
+                tempfd.numOfLoads++;
+                pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
+                pageRefCount[tempfd.pageno.pid][1] = pageRefCount[tempfd.pageno.pid][1] + 1;
+            }
+	    }
+
+        //updating frame descriptor and notifying to replacer
+        tempfd.pageno.pid = pageno.pid;
+        tempfd.pincnt = 1;
+        tempfd.dirty = false;
+        pagemap.put(Integer.valueOf(pageno.pid), tempfd);
+        tempfd.state =FIFO.PINNED;
+        replacer.pinPage(tempfd);
+        
+        
+    }
 
   /**
    * Unpins a disk page from the buffer pool, decreasing its pin count.
@@ -227,7 +311,7 @@ public class BufMgr implements GlobalConst {
           tempfd.pincnt--;
           tempfd.dirty = dirty;
           if(tempfd.pincnt== 0)
-          tempfd.state = Policy.REFERENCED;
+          tempfd.state = FIFO.REFERENCED;
           replacer.unpinPage(tempfd);
           return;
       }
@@ -302,46 +386,44 @@ public class BufMgr implements GlobalConst {
     
     public void printBhrAndRefCount(){ 
     
-    
-    //print counts:
-    System.out.println("totPageHits: "+totPageHits);
-    System.out.println("totPageRequests: "+totPageRequests);
-    System.out.println("pageLoadHits: "+pageLoadHits);
-    System.out.println("pageLoadRequests: "+pageLoadRequests);
-    System.out.println("+----------------------------------------+");
-    System.out.println("Unique page loads: "+uniquePageLoads);
-    System.out.println("Page faults (policy dependent): "+pageFaults);
-    System.out.println("+----------------------------------------+");
-    
-    
-    //compute BHR1 and BHR2 
-    aggregateBHR = -1; //replce -1 with the formula   
+    Arrays.sort(pageRefCount, (a, b) -> Integer.compare(b[2],a[2])); //decreasing order
+    pageLoadRequests = pageLoadRequests - 1;
+    aggregateBHR = ( (double)totPageHits / (double)pageLoadRequests ); //replce -1 with the formula   
     pageLoadBHR = -1;  //replce -1 with the formula  
-  
-    System.out.print("Aggregate BHR (BHR1): ");
-    System.out.printf("%9.5f\n", aggregateBHR);
-    System.out.print("Load-based BHR (BHR2): ");
-    System.out.printf("%9.5f\n", pageLoadBHR);
+    //print counts:
     System.out.println("+----------------------------------------+");
-       
-/*    //before sorting, need to compare the LAST refcounts and fix it
-    for (int i = 0; i < pageRefCount.length ; i++) {
-        if (pageRefCount[i][0] > pageRefCount[i][1]) pageRefCount[i][1] = pageRefCount[i][0];
+    System.out.println("Aggregate Page Hits: "+ totPageHits);
+    System.out.println("+----------------------------------------+");
+    System.out.println("Aggregate Page Loads: "+ pageLoadRequests);
+    System.out.println("+----------------------------------------+");
+    System.out.print("Aggregate BHR (BHR1) : ");
+    System.out.printf("%9.5f\n", aggregateBHR);
+    System.out.println("+----------------------------------------+");
+    System.out.println("The top pages with respect to hits are:\n");
+    if(totPageHits > 0)
+    {
+        System.out.println("Page No.\tNo. of Page Loads\tNo. of Page Hits\tNo. of times Victim\tHit Ratios");
+        for(int i =0; i <  pageRefCount.length; i++)
+        {
+            System.out.println(pageRefCount[i][0] + "\t\t\t" + pageRefCount[i][1] + "\t\t\t" + pageRefCount[i][2] + "\t\t\t" + pageRefCount[i][3] + "\t\t\t" + (pageRefCount[i][2]/totPageHits));
+        }
+    }
+
+    else
+    {
+        System.out.println("Page No.\tNo. of Page Loads\tNo. of Page Hits\tNo. of times Victim\tHit Ratios");
+        for(int i =0; i < pageRefCount.length; i++)
+        {
+            System.out.println(pageRefCount[i][0] + "\t\t\t" + pageRefCount[i][1] + "\t\t\t" + pageRefCount[i][2] + "\t\t\t" + pageRefCount[i][3] + "\t\t\t" + 0);
+        }
+    }
+    System.out.println("+----------------------------------------+");
+    for(int i = 0; i < pageRefCount.length; i++)
+    {
         pageRefCount[i][0] = 0;
     }
-    //Sort and print top k page references here. done by this code
-    sortbyColumn(pageRefCount, 1);
-    
-    System.out.println("The top k (10) referenced pages are:");
-    System.out.println("       Page No.\t\tNo. of references");
-       
-    for (int i = 0; i < 10 ; i++)    
-      System.out.println("\t"+pageRefCount[i][2]+"\t\t"+pageRefCount[i][1]);
-    
-    System.out.println("+----------------------------------------+");
-    //* System.out.println("pageRefCount.length: "+pageRefCount.length);
-    // *for (int i = 0; i < pageRefCount.length ; i++)    
-      // *System.out.println("\t"+pageRefCount[i][2]+"\t\t"+pageRefCount[i][1]+"\t\t"+pageRefCount[i][0]);*/
+
+
 }
 
 } // public class BufMgr implements GlobalConst
