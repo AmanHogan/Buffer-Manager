@@ -26,6 +26,8 @@ class FrameDesc {
 
   public int numOfLoads;
 
+  public long timestamp;
+
   // --------------------------------------------------------------------------
 
   /**
@@ -39,6 +41,7 @@ class FrameDesc {
     state = 0;
     numOfHits = 0;
     numOfLoads = 0;
+    timestamp = 1000000000;
   }
 
 } // class FrameDesc

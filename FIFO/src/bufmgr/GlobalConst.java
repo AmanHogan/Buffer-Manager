@@ -2,10 +2,15 @@ package global;
 
 public interface GlobalConst {
 
+
+  public static final boolean UNPIN_CLEAN = false;
+  public static final boolean UNPIN_DIRTY = true;
+  
+
   public static final int MINIBASE_MAXARRSIZE = 50;
 
   // Here you need to change the buffer size.
-  public static final int NUMBUF = 50;
+  public static final int NUMBUF = 42;
 
   /** Size of page. */
   public static final int MINIBASE_PAGESIZE = 1024;           // in bytes
@@ -40,6 +45,8 @@ public interface GlobalConst {
 
   public static final boolean PIN_MEMCPY = true;
   public static final boolean PIN_DISKIO = false;
+
+
   
   /**
    * added for computing BHR 1 & 2 for the time being here
