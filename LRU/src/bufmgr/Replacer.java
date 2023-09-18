@@ -46,5 +46,7 @@ abstract class Replacer implements GlobalConst {
    */
   public abstract int pickVictim();
 
+  public abstract void printReplacerInfo();
+
 } // abstract class Replacer implements GlobalConst
 

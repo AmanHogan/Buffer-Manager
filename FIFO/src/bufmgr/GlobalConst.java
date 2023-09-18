@@ -8,8 +8,10 @@ public interface GlobalConst {
   
 
   public static final int MINIBASE_MAXARRSIZE = 50;
-
-  // Here you need to change the buffer size.
+  
+  /*
+   * @desc - Numbers of buffers to be used. Assigned 15 and 42
+  */
   public static final int NUMBUF = 42;
 
   /** Size of page. */

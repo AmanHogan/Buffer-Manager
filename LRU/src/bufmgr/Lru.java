@@ -68,6 +68,30 @@ class Lru extends Replacer
 		update(frameIndex);
 	}
 
+    /**
+     * Notifies the replacer of an unpinned page.
+     */
+
+	public void unpinPage(FrameDesc fdesc) 
+	{
+		if (fdesc.pincnt == 0)
+			fdesc.state = REFERENCED;
+	}
+
+	/**
+	 * Notifies the replacer of a free page.
+	 */
+	public void freePage(FrameDesc fdesc) { }
+
+	/**
+	 * Notifies the replacer of a new page.
+	 */
+	public void newPage(FrameDesc fdesc) { }
+
+
+
+
+
 	/**
 	 * Finding a free frame in the buffer pool
 	 * or choosing a page to replace using your policy
@@ -109,4 +133,20 @@ class Lru extends Replacer
 		// No frames were available
 		return -1;
 	}
+
+	/**
+	 * @desc - Prints out the name of the policy and the number of buffers being used
+	 * @param None
+	 * @return 	return the frame number return -1 if failed
+	*/
+	public void printReplacerInfo()
+	{
+		System.out.println("+----------------------------------------+");
+		System.out.println("	The policy Being used is LRU ");
+		System.out.println("+----------------------------------------+");
+		System.out.println("	The number of buffers is: " + mgrArg.getNumBuffers());
+		System.out.println("+----------------------------------------+");
+	}
+
+
 }

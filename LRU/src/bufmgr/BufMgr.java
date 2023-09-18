@@ -17,6 +17,10 @@ import java.util.Comparator;
  */
 public class BufMgr implements GlobalConst 
 {
+    /** @desc - number of buffers in buffer pool (15 and 42) */
+    int numberOfBuffers = 42;
+    // int numberOfBuffers = 15;
+
     /* Actual pool of pages */
     protected Page[] bufpool;
 
@@ -64,6 +68,8 @@ public class BufMgr implements GlobalConst
      **/
     public BufMgr(int numbufs) 
     {   
+        numbufs = numberOfBuffers;
+        
         // Initialize bufferpool and frametable
         bufpool = new Page[numbufs];
         frametab = new FrameDesc[numbufs];
@@ -334,6 +340,7 @@ public class BufMgr implements GlobalConst
         }
         return numUnpinned;
     }
+    
     
     public void printBhrAndRefCount()
     { 

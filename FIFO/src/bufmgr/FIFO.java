@@ -92,5 +92,20 @@ class FIFO extends Replacer
             return -1; 
         
         return victim;
-    } 
+    }
+
+    /**
+     * @desc - Prints out the name of the policy and the number of buffers being used
+     * @param None
+     * @return 	return the frame number return -1 if failed
+    */
+	public void printReplacerInfo()
+	{
+		System.out.println("+----------------------------------------+");
+		System.out.println("	The policy Being used is LRU ");
+		System.out.println("+----------------------------------------+");
+		System.out.println("	The number of buffers is: " + mgrArg.getNumBuffers());
+		System.out.println("+----------------------------------------+");
+	}
+
 } 
