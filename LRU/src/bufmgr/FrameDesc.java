@@ -7,31 +7,32 @@ import global.PageId;
  */
 class FrameDesc {
 
-/** Index in the buffer pool. */
+/** @desc - Index in the buffer pool. */
   public int index;
   
-  /** Identifies the frame's page. */
+  /** @desc - Identifies the frame's page. */
   public PageId pageno;
 
-  /** The frame's pin count. */
+  /** @desc - The frame's pin count. */
   public int pincnt;
 
-  /** The frame's dirty status. */
+  /** @desc - The frame's dirty status. */
   public boolean dirty;
 
-  /** Generic state used by replacers. */
+  /* @desc - Generic state used by replacers. */
   public int state;
 
+  /* @desc - number of hits for current page */
   public int numOfHits;
 
+  /* @desc - number of loads for current page */
   public int numOfLoads;
-
-  // --------------------------------------------------------------------------
-
+  
   /**
    * Default constructor; empty frame.
    */
-  public FrameDesc(int index) {
+  public FrameDesc(int index) 
+  {
     this.index = index;
     pageno = new PageId();
     pincnt = 0;

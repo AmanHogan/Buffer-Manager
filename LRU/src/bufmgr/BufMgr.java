@@ -10,14 +10,13 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 /*
- * The buffer manager reads disk pages into a mains memory page as needed. The
+ * @ desc The buffer manager reads disk pages into a mains memory page as needed. The
  * collection of main memory pages (called frames) used by the buffer manager
  * for this purpose is called the buffer pool. This is just an array of Page
  * objects.
  */
 public class BufMgr implements GlobalConst 
 {
-
     /* Actual pool of pages */
     protected Page[] bufpool;
 
@@ -30,7 +29,9 @@ public class BufMgr implements GlobalConst
     /* The replacement policy  */
     protected Replacer replacer;
 
-    // BHR variables
+    /** 
+     * @desc - BHR Variables used in calculating Hit / Load Requests
+    */
     protected int totPageHits;
     protected int totPageRequests;
     protected int pageLoadHits;
@@ -38,17 +39,24 @@ public class BufMgr implements GlobalConst
     protected int uniquePageLoads = 0;
     protected int pageFaults = 0;
     
-    // BHR Values - The number of hits divided by the number of requests
+    /**
+     * @ desc - BHR Values - The number of hits divided by the number of requests
+    */
     protected double aggregateBHR = 0;
     protected double pageLoadBHR = -1;
     protected final int maxPages = 100;
 
-    // Array that keeps track of information about pages
-    // [0]PageNo, [1]Loads, [2]Hits, [3]Victim count
+    /**
+     * @desc -
+     * Array that keeps track of information about pages
+     * [0]PageNo, [1]Loads, [2]Hits, [3]Victim count
+     */
     protected int[][] pageRefCount = new int[1000][4]; 
 
-    // The number of pages you want to print out the information about
-    protected int kTopPages = 100;
+    /**
+     * @desc - The number of pages you want to print relative to hit count
+     */
+    protected int kTopPages = 50;
 
     /**
      * Constructs a buffer mamanger with the given settings.
@@ -77,7 +85,6 @@ public class BufMgr implements GlobalConst
     /**
      * Allocates a set of new pages, and pins the first one in an appropriate
      * frame in the buffer pool.
-     * 
      * @param firstpg holds the contents of the first page
      * @param run_size number of pages to allocate
      * @return page id of the first new page
@@ -126,7 +133,7 @@ public class BufMgr implements GlobalConst
    */
     public void freePage(PageId pageno) 
     {  
-        //the frame descriptor as the page is in the buffer pool 
+        //the frame descriptor as the page is in the buffer pool
         FrameDesc tempfd = pagemap.get(Integer.valueOf(pageno.pid));
         
         //the page is in the pool so it cannot be null.
@@ -150,10 +157,9 @@ public class BufMgr implements GlobalConst
     }
 
   /**
-   * Pins a disk page into the buffer pool. If the page is already pinned, this
+   * @desc - Pins a disk page into the buffer pool. If the page is already pinned, this
    * simply increments the pin count. Otherwise, this selects another page in
    * the pool to replace, flushing it to disk if dirty.
-   * 
    * @param pageno identifies the page to pin
    * @param page holds contents of the page, either an input or output param
    * @param skipRead PIN_MEMCPY (replace in pool); PIN_DISKIO (read the page in)
@@ -328,7 +334,6 @@ public class BufMgr implements GlobalConst
         }
         return numUnpinned;
     }
-  
     
     public void printBhrAndRefCount()
     { 

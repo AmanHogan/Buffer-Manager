@@ -3,10 +3,9 @@ import diskmgr.*;
 import global.*;
 
 /**
- * class Policy is a subclass of class Replacer use the given replacement
+ * @desc - class Policy is a subclass of class Replacer use the given replacement
  * policy algorithm for page replacement
  */
-
 class Lru extends Replacer 
 {
 	// My constants werent working globally, so I initialized them here
@@ -14,13 +13,11 @@ class Lru extends Replacer
 	protected static final int AVAILABLE = 10;
 	protected static final int REFERENCED = 11;
 	protected static final int PINNED = 12;
-
 	private BufMgr mgrArg;
 
-	/* private field - An array to hold number of frames in the buffer pool */
+	/** @desc - holds number of frames in the buffer pool */
 	private int  nframes; 
-
-	/* private field - number of frames used */ 
+	/** @desc - array of frames */ 
 	private int  frames[]; 
 
 	public Lru(BufMgr mgrArg)
@@ -59,7 +56,6 @@ class Lru extends Replacer
 		frames[nframes-1] = frameNo;
 	}
 
-
 	/**
 	 * Notifies the replacer of a pined page.
 	 * @param fdesc - frame descriptor object that contains details about a frame
@@ -80,8 +76,9 @@ class Lru extends Replacer
 	*/
 	public int pickVictim() 
 	{
-
 		int bufferSize = mgrArg.getNumBuffers();
+		
+		/** @desc - frame that is to be evicted */
 		int victim = 0;
 
 		// If the number of frames is less than th buffer size ...
