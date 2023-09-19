@@ -3,7 +3,7 @@ package bufmgr;
 import global.GlobalConst;
 
 /**
- * Base class for buffer pool replacement policies.
+ * @brief Base class for buffer pool replacement policies.
  */
 abstract class Replacer implements GlobalConst {
 

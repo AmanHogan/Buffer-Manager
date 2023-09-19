@@ -3,8 +3,7 @@ import diskmgr.*;
 import global.*;
 
 /**
- * @brief - class Policy is a subclass of class Replacer use the given replacement
- * policy algorithm for page replacement
+ * @brief Implements the First in First Out Algorithm for page replacement
  */
 class FIFO extends Replacer 
 {

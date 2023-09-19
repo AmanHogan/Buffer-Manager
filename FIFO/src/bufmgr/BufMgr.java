@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import bufmgr.FIFO;
 
 /*
  * @brief The buffer manager reads disk pages into a mains memory page as needed. The

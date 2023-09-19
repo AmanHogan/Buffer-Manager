@@ -3,7 +3,7 @@ package bufmgr;
 import global.PageId;
 
 /**
- * A frame descriptor; contains info about each page in the buffer pool.
+ * @brief A frame descriptor; contains info about each page in the buffer pool.
  */
 class FrameDesc {
 

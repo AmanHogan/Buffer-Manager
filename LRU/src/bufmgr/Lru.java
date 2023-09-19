@@ -3,8 +3,7 @@ import diskmgr.*;
 import global.*;
 
 /**
- * @desc - class Policy is a subclass of class Replacer use the given replacement
- * policy algorithm for page replacement
+ * @brief Implements the Least Recently Used Algorithm for page replacement
  */
 class Lru extends Replacer 
 {
