@@ -3,7 +3,7 @@ import diskmgr.*;
 import global.*;
 
 /**
- * @desc - class Policy is a subclass of class Replacer use the given replacement
+ * @brief - class Policy is a subclass of class Replacer use the given replacement
  * policy algorithm for page replacement
  */
 class FIFO extends Replacer 
@@ -35,7 +35,6 @@ class FIFO extends Replacer
     /**
      * Notifies the replacer of a new page.
      */
-
     public void newPage(FrameDesc fdesc) 
     {
         // no need to update frame state
@@ -44,7 +43,6 @@ class FIFO extends Replacer
     /**
      * Notifies the replacer of a free page.
      */
-
     public void freePage(FrameDesc fdesc) 
     {
         fdesc.state = AVAILABLE;
@@ -61,7 +59,6 @@ class FIFO extends Replacer
     /**
      * Notifies the replacer of an unpinned page.
      */
-
     public void unpinPage(FrameDesc fdesc) 
     {
         if (fdesc.pincnt == 0)
@@ -69,7 +66,7 @@ class FIFO extends Replacer
     }
 
     /**
-     * @desc - Selects the best frame to use for pinning a new page.
+     * @brief - Selects the best frame to use for pinning a new page.
      * @param None
      * @return victim frame number, or -1 if none available
      */
@@ -95,17 +92,16 @@ class FIFO extends Replacer
     }
 
     /**
-     * @desc - Prints out the name of the policy and the number of buffers being used
+     * @brief - Prints out the name of the policy and the number of buffers being used
      * @param None
      * @return 	return the frame number return -1 if failed
     */
 	public void printReplacerInfo()
 	{
 		System.out.println("+----------------------------------------+");
-		System.out.println("	The policy Being used is LRU ");
+		System.out.println("	The policy Being used is FIFO ");
 		System.out.println("+----------------------------------------+");
 		System.out.println("	The number of buffers is: " + mgrArg.getNumBuffers());
 		System.out.println("+----------------------------------------+");
 	}
-
 } 

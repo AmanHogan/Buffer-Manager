@@ -8,33 +8,36 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 /*
- * @ desc The buffer manager reads disk pages into a mains memory page as needed. The
+ * @brief The buffer manager reads disk pages into a mains memory page as needed. The
  * collection of main memory pages (called frames) used by the buffer manager
  * for this purpose is called the buffer pool. This is just an array of Page
  * objects.
  */
 public class BufMgr implements GlobalConst 
 {
-    /** @desc - number of buffers in buffer pool (15 and 42) */
-    int numberOfBuffers = 42;
+    /** @brief - number of buffers in buffer pool (15 and 42) */
+    int numberOfBuffers = 15;
     // int numberOfBuffers = 15;
 
-    /* Actual pool of pages */
+    /** Actual pool of pages */
     protected Page[] bufpool;
 
-    /* Array of frame descriptors*/
+    /** Array of frame descriptors*/
     protected FrameDesc[] frametab;
 
-    /* Maps current page numbers to frames*/
+    /** Maps current page numbers to frames*/
     protected HashMap<Integer, FrameDesc> pagemap;
 
-    /* The replacement policy  */
+    /** The replacement policy  */
     protected Replacer replacer;
 
     /** 
-     * @desc - BHR Variables used in calculating Hit / Load Requests
+     * @brief - BHR Variables used in calculating Hit / Load Requests
     */
     protected int totPageHits;
     protected int totPageRequests;
@@ -51,25 +54,24 @@ public class BufMgr implements GlobalConst
     protected final int maxPages = 100;
 
     /**
-     * @desc -
-     * Array that keeps track of information about pages
+     * @brief Array that keeps track of information about pages
      * [0]PageNo, [1]Loads, [2]Hits, [3]Victim count
      */
     protected int[][] pageRefCount = new int[1000][4]; 
 
     /**
-     * @desc - The number of pages you want to print relative to hit count
+     * @brief - The number of pages you want to print relative to hit count
      */
     protected int kTopPages = 50;
 
     /**
      * Constructs a buffer mamanger with the given settings.
      * @param numbufs number of buffers in the buffer pool
-     **/
+     */
     public BufMgr(int numbufs) 
     {   
         numbufs = numberOfBuffers;
-        
+
         // Initialize bufferpool and frametable
         bufpool = new Page[numbufs];
         frametab = new FrameDesc[numbufs];
@@ -163,7 +165,7 @@ public class BufMgr implements GlobalConst
     }
 
   /**
-   * @desc - Pins a disk page into the buffer pool. If the page is already pinned, this
+   * @brief - Pins a disk page into the buffer pool. If the page is already pinned, this
    * simply increments the pin count. Otherwise, this selects another page in
    * the pool to replace, flushing it to disk if dirty.
    * @param pageno identifies the page to pin
@@ -176,12 +178,11 @@ public class BufMgr implements GlobalConst
     {  
         //the frame descriptor as the page is in the buffer pool 
 	    FrameDesc tempfd = pagemap.get(Integer.valueOf(pageno.pid));
-
+        
         // Increment the number of total hits in the page ref
-        if(tempfd != null && tempfd.pageno.pid > 8 )
+        if(pageno.pid > 8 )
         {
-            pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
-            pageRefCount[tempfd.pageno.pid][2] = pageRefCount[tempfd.pageno.pid][2] + 1;
+            totPageRequests++;
         }
 
         // If the page is in the pool ...
@@ -199,9 +200,13 @@ public class BufMgr implements GlobalConst
                 page.setPage(bufpool[tempfd.index]);
                 
                 // increment number of hits in buffer pool
-                if(tempfd.pageno.pid > 8)
+                if(pageno.pid > 8)
+                {
                     totPageHits++;
-                
+                    pageRefCount[pageno.pid][0] = pageno.pid;
+                    pageRefCount[pageno.pid][2] = pageRefCount[pageno.pid][2] + 1;
+                }
+                         
                 return;
             }
         }
@@ -218,12 +223,14 @@ public class BufMgr implements GlobalConst
                 
             tempfd = frametab[i];
 
-            // Increment the number of page references
-            if(tempfd != null && tempfd.pageno.pid > 8 )
-            {
-                pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
-                pageRefCount[tempfd.pageno.pid][3] = pageRefCount[tempfd.pageno.pid][3] + 1;
+            if(pageno.pid > 8)
+            {   
+                pageLoadRequests++;
+                pageRefCount[pageno.pid][0] = pageno.pid;
+                pageRefCount[pageno.pid][1] = pageRefCount[pageno.pid][1] + 1;
+                pageRefCount[pageno.pid][3] = pageRefCount[pageno.pid][3] + 1;
             }
+            
           
             // if the victim is dirty writing it to disk 
             if(tempfd.pageno.pid != -1)
@@ -241,16 +248,7 @@ public class BufMgr implements GlobalConst
                 Minibase.DiskManager.read_page(pageno, bufpool[i]);
 
             // add page to buffer pool
-            page.setPage(bufpool[i]);
-   
-            // Increment number of load requests and update page ref array
-            pageLoadRequests++;
-            if(tempfd.pageno.pid != -1 && tempfd.pageno.pid > 8)
-            {   
-                tempfd.numOfLoads++;
-                pageRefCount[tempfd.pageno.pid][0] = tempfd.pageno.pid;
-                pageRefCount[tempfd.pageno.pid][1] = pageRefCount[tempfd.pageno.pid][1] + 1;
-            }
+            page.setPage(bufpool[i]);           
 	    }
 
         //updating frame descriptor and notifying to replacer
@@ -340,19 +338,22 @@ public class BufMgr implements GlobalConst
         }
         return numUnpinned;
     }
-    
-    
+    /**
+     * @breif Prints our information about the BHR, Page HIts, Load Requests, Replacer used,
+     * and it outputs this infomration to a file and in the console.
+     */
     public void printBhrAndRefCount()
-    { 
+    {
+        /** Prints the replcer being used */
+        replacer.printReplacerInfo();
+        
         // Sort the 2d array first
         Arrays.sort(pageRefCount, (a, b) -> Integer.compare(b[2],a[2])); //decreasing order
         
         // Fix page reference counts an calculate BHR
         pageLoadRequests = pageLoadRequests - 1;
         aggregateBHR = ( (double)totPageHits / (double)pageLoadRequests );
-        
-        // pageLoadBHR = -1;
-        
+            
         //print counts:
         System.out.println("+----------------------------------------+");
         System.out.println("Aggregate Page Hits: "+ totPageHits);
@@ -380,5 +381,84 @@ public class BufMgr implements GlobalConst
                 System.out.println(pageRefCount[i][0] + "\t\t\t" + pageRefCount[i][1] + "\t\t\t" + pageRefCount[i][2] + "\t\t\t" + pageRefCount[i][3] + "\t\t\t" + 0);
         }
         System.out.println("+----------------------------------------+");
+
+        try
+        {
+            outputToFile();
+        }
+
+       catch(Exception e)
+       {
+        System.out.println(e);;
+       }
+    }
+
+    /**
+     * @brief Prints the BHR information to an output file
+     * <Replacer>-bhrtest-output-<numbufs>.txt
+     * @throws IOException
+     */
+    public void outputToFile() throws IOException 
+    {
+        String folderName = "output";
+        String fileName = "Lru-bhrtest-output-" + numberOfBuffers + ".txt" ;
+        File folder = new File(folderName);
+        File file = new File(folder, fileName);
+
+        try 
+        {
+            // Create the folder if it doesn't exist
+            if (!folder.exists()) {
+                if (folder.mkdirs()) {
+                    System.out.println("Folder created: " + folder.getAbsolutePath());
+                } else {
+                    System.err.println("Failed to create folder: " + folder.getAbsolutePath());
+                    return;
+                }
+            }
+
+            // Create the file and write content to it
+            FileWriter writer = new FileWriter(file, true);
+
+            //print counts:
+            writer.write("+----------------------------------------+\n");
+            writer.write("The policy Being used is Lru\n");
+            writer.write("+----------------------------------------+\n");
+            writer.write("The number of buffers is: " + getNumBuffers() + "\n");
+            writer.write("+----------------------------------------+\n");
+            writer.write("Aggregate Page Hits: "+ totPageHits + "\n");
+            writer.write("+----------------------------------------+\n");
+            writer.write("Aggregate Page Loads: "+ pageLoadRequests + "\n");
+            writer.write("+----------------------------------------+\n");
+            writer.write("Aggregate BHR (BHR1) : ");
+            writer.write(String.valueOf(aggregateBHR) + "\n");
+            writer.write("+----------------------------------------+\n");
+            writer.write("The top (" + kTopPages + ") pages with respect to hits are:\n");
+        
+            // If total pages are > 0, calculate hit ratio
+            if(totPageHits > 0)
+            {
+                writer.write("Page No.\t\tNo. of Page Loads\t\tNo. of Page Hits\t\tNo. of times Victim\t\tHit Ratios\n");
+                for(int i =0; i <  kTopPages; i++)
+                    writer.write(pageRefCount[i][0] + "\t\t\t\t" + pageRefCount[i][1] + "\t\t\t\t" + pageRefCount[i][2] + "\t\t\t\t" + pageRefCount[i][3] + "\t\t\t\t" + (pageRefCount[i][2]/totPageHits) + "\n");
+            }
+
+            // If total pages are < 0, do not calculate hit ratios
+            else
+            {
+                writer.write("Page No.\t\tNo. of Page Loads\t\tNo. of Page Hits\t\tNo. of times Victim\t\tHit Ratios\n");
+                for(int i =0; i < kTopPages; i++)
+                    writer.write(pageRefCount[i][0] + "\t\t\t\t" + pageRefCount[i][1] + "\t\t\t\t" + pageRefCount[i][2] + "\t\t\t\t" + pageRefCount[i][3] + "\t\t\t\t" + 0 + "\n");
+            }
+
+            writer.write("+----------------------------------------+\n");
+            writer.close();
+            System.out.println("File created and content written: " + file.getAbsolutePath());
+        } 
+        
+        catch (IOException e) 
+        {
+            System.err.println("An error occurred: " + e.getMessage());
+        }
     }
 } // public class BufMgr implements GlobalConst
