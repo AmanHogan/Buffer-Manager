@@ -21,8 +21,8 @@ import java.io.IOException;
 public class BufMgr implements GlobalConst 
 {
     /** @brief - number of buffers in buffer pool (15 and 42) */
-    int numberOfBuffers = 15;
-    // int numberOfBuffers = 15;
+    //int numberOfBuffers = 42;
+     int numberOfBuffers = 15;
 
     /** Actual pool of pages */
     protected Page[] bufpool;

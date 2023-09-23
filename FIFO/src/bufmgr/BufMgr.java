@@ -22,8 +22,8 @@ import bufmgr.FIFO;
 public class BufMgr implements GlobalConst 
 {
     /** @brief - number of buffers in buffer pool (15 and 42) */
-    int numberOfBuffers = 15;
-    // int numberOfBuffers = 15;
+    //int numberOfBuffers = 42;
+     int numberOfBuffers = 15;
 
     /** Actual pool of pages */
     protected Page[] bufpool;
@@ -45,7 +45,6 @@ public class BufMgr implements GlobalConst
     protected int pageLoadHits;
     protected int pageLoadRequests;
     protected int uniquePageLoads = 0;
-    protected int pageFaults = 0;
     
     /**
      * @ desc - BHR Values - The number of hits divided by the number of requests
